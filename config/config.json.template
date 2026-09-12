@@ -1,0 +1,37 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+
+  "inbounds": [
+    {
+      "tag": "vless-ws",
+      "listen": "127.0.0.1",
+      "port": 10000,
+      "protocol": "vless",
+
+      "settings": {
+        "clients": [
+          {
+            "id": "${XRAY_UUID}"
+          }
+        ],
+        "decryption": "none"
+      },
+
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/xray"
+        }
+      }
+    }
+  ],
+
+  "outbounds": [
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    }
+  ]
+}
