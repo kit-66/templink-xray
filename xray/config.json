@@ -1,0 +1,51 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+
+  "inbounds": [
+    {
+      "listen": "127.0.0.1",
+      "port": 10000,
+      "protocol": "vless",
+
+      "settings": {
+        "clients": [
+          {
+            "id": "2e6b158b-b505-474f-93b1-9a80820601a2",
+            "level": 0
+          }
+        ],
+        "decryption": "none"
+      },
+
+      "streamSettings": {
+        "network": "ws",
+        "security": "none",
+
+        "wsSettings": {
+          "path": "/xray"
+        }
+      },
+
+      "tag": "vless-ws"
+    }
+  ],
+
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "direct"
+    },
+
+    {
+      "protocol": "blackhole",
+      "tag": "block"
+    }
+  ],
+
+  "routing": {
+    "domainStrategy": "AsIs",
+    "rules": []
+  }
+}
