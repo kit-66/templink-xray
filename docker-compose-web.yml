@@ -1,0 +1,12 @@
+services:
+  web:
+    image: comradekit66/templink-web:1.0.0
+    container_name: templink-web
+    restart: unless-stopped
+    network_mode: host
+
+    env_file:
+      - .env
+
+    volumes:
+      - ./site:/app/site:ro
