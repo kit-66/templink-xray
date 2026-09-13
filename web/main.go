@@ -1,9 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -42,6 +48,7 @@ var (
 	vlessPort   string
 	vlessPath   string
 	vlessName   string
+	logoPath    string
 )
 
 func env(key, fallback string) string {
@@ -187,6 +194,89 @@ func accessHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// overlayLogoOnQR добавляет логотип в центр QR-кода
+func overlayLogoOnQR(qrImage []byte, logPath string) ([]byte, error) {
+	// Декодируем QR-код
+	qrImg, err := png.Decode(bytes.NewReader(qrImage))
+	if err != nil {
+		return nil, fmt.Errorf("decode QR: %w", err)
+	}
+
+	// Открываем логотип
+	logoFile, err := os.Open(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("open logo: %w", err)
+	}
+	defer logoFile.Close()
+
+	logoImg, err := png.Decode(logoFile)
+	if err != nil {
+		return nil, fmt.Errorf("decode logo: %w", err)
+	}
+
+	// Получаем размеры
+	qrBounds := qrImg.Bounds()
+	logoBounds := logoImg.Bounds()
+
+	qrWidth := qrBounds.Dx()
+	qrHeight := qrBounds.Dy()
+	logoWidth := logoBounds.Dx()
+	logoHeight := logoBounds.Dy()
+
+	// Размер логотипа: 25% от размера QR-кода
+	maxLogoSize := qrWidth / 4
+	var resizedLogoWidth, resizedLogoHeight int
+
+	if logoWidth > maxLogoSize {
+		ratio := float64(logoHeight) / float64(logoWidth)
+		resizedLogoWidth = maxLogoSize
+		resizedLogoHeight = int(float64(maxLogoSize) * ratio)
+	} else {
+		resizedLogoWidth = logoWidth
+		resizedLogoHeight = logoHeight
+	}
+
+	// Создаём новое изображение RGBA для результата
+	result := image.NewRGBA(qrBounds)
+
+	// Копируем QR-код
+	draw.Draw(result, qrBounds, qrImg, qrBounds.Min, draw.Src)
+
+	// Вычисляем позицию логотипа (центр QR-кода)
+	startX := (qrWidth - resizedLogoWidth) / 2
+	startY := (qrHeight - resizedLogoHeight) / 2
+
+	// Масштабируем и накладываем логотип
+	for y := 0; y < resizedLogoHeight; y++ {
+		for x := 0; x < resizedLogoWidth; x++ {
+			// Вычисляем исходные координаты в логотипе
+			srcX := logoBounds.Min.X + (x*logoWidth)/resizedLogoWidth
+			srcY := logoBounds.Min.Y + (y*logoHeight)/resizedLogoHeight
+
+			// Получаем пиксель из логотипа
+			r, g, b, a := logoImg.At(srcX, srcY).RGBA()
+
+			// Если пиксель не полностью прозрачен, добавляем его на результат
+			if a > 0 {
+				result.SetRGBA(startX+x, startY+y, color.RGBA{
+					R: uint8(r >> 8),
+					G: uint8(g >> 8),
+					B: uint8(b >> 8),
+					A: uint8(a >> 8),
+				})
+			}
+		}
+	}
+
+	// Кодируем результат в PNG
+	buf := &bytes.Buffer{}
+	if err := png.Encode(buf, result); err != nil {
+		return nil, fmt.Errorf("encode PNG: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
 func qrHandler(w http.ResponseWriter, r *http.Request) {
 	if err := ensureAccess(); err != nil {
 		log.Printf("qr access error: %v", err)
@@ -198,17 +288,30 @@ func qrHandler(w http.ResponseWriter, r *http.Request) {
 	link := makeVLESS(manager.access.UUID)
 	manager.mu.Unlock()
 
-	png, err := qrcode.Encode(link, qrcode.Medium, 320)
+	qrPNG, err := qrcode.Encode(link, qrcode.Medium, 320)
 	if err != nil {
 		log.Printf("qr error: %v", err)
 		http.Error(w, "QR error", http.StatusInternalServerError)
 		return
 	}
 
+	// Добавляем логотип, если он существует
+	if logoPath != "" {
+		if _, err := os.Stat(logoPath); err == nil {
+			qrWithLogo, err := overlayLogoOnQR(qrPNG, logoPath)
+			if err != nil {
+				log.Printf("logo overlay error: %v", err)
+				// Продолжаем с исходным QR-кодом без логотипа
+			} else {
+				qrPNG = qrWithLogo
+			}
+		}
+	}
+
 	w.Header().Set("Content-Type", "image/png")
 	w.Header().Set("Cache-Control", "no-store")
 
-	_, _ = w.Write(png)
+	_, _ = w.Write(qrPNG)
 }
 
 func main() {
@@ -235,6 +338,9 @@ func main() {
 
 	webAddr := env("WEB_ADDR", "127.0.0.1")
 	webPort := env("WEB_PORT", "3002")
+
+	// Логотип загружается из /app/assets/logo.png по умолчанию
+	logoPath = env("LOGO_PATH", "/app/assets/logo.png")
 
 	xrayAPI := xrayAPIAddr + ":" + xrayAPIPort
 	listenAddr := webAddr + ":" + webPort
@@ -270,6 +376,11 @@ func main() {
 	log.Printf("xray api: %s", xrayAPI)
 	log.Printf("xray inbound: %s", xrayInbound)
 	log.Printf("access TTL: %d minutes", minutes)
+	if _, err := os.Stat(logoPath); err == nil {
+		log.Printf("logo loaded from: %s", logoPath)
+	} else {
+		log.Printf("logo not found at: %s", logoPath)
+	}
 
 	if err := server.ListenAndServe(); err != nil &&
 		err != http.ErrServerClosed {
