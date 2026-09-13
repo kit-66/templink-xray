@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Временный доступ</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #111;
+            color: #eee;
+            font-family: Arial, sans-serif;
+        }
+
+        .card {
+            width: min(420px, calc(100% - 30px));
+            padding: 28px;
+            background: #1b1b1b;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, .4);
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: 26px;
+        }
+
+        .subtitle {
+            margin-bottom: 22px;
+            color: #aaa;
+        }
+
+        #qr {
+            width: 280px;
+            max-width: 100%;
+            border-radius: 10px;
+            background: white;
+            padding: 10px;
+        }
+
+        .timer {
+            margin-top: 18px;
+            font-size: 18px;
+        }
+
+        #time {
+            font-weight: bold;
+        }
+
+        .link-box {
+            margin-top: 18px;
+            padding: 12px;
+            background: #111;
+            border-radius: 8px;
+            word-break: break-all;
+            font-size: 13px;
+            color: #aaa;
+            text-align: left;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 12px;
+            padding: 12px;
+            border: 0;
+            border-radius: 8px;
+            background: #eee;
+            color: #111;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #ddd;
+        }
+
+        .error {
+            color: #ff6b6b;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="card">
+
+    <h1>Временный доступ</h1>
+
+    <div class="subtitle">
+        Отсканируйте QR-код в клиенте VLESS
+    </div>
+
+    <img id="qr" src="/api/qr" alt="QR">
+
+    <div class="timer">
+        Ссылка действует:
+        <span id="time">—</span>
+    </div>
+
+    <div class="link-box" id="vless">
+        Получение ссылки...
+    </div>
+
+    <button id="copy">
+        Скопировать VLESS-ссылку
+    </button>
+
+    <div class="error" id="error"></div>
+
+</div>
+
+<script>
+let expiresAt = 0;
+let timer = null;
+
+async function loadAccess() {
+    try {
+        const response = await fetch('/api/access?t=' + Date.now(), {
+            cache: 'no-store'
+        });
+
+        if (!response.ok) {
+            throw new Error('Ошибка получения доступа');
+        }
+
+        const data = await response.json();
+
+        expiresAt = data.expires_at * 1000;
+
+        document.getElementById('vless').textContent = data.vless;
+        document.getElementById('error').textContent = '';
+
+        document.getElementById('qr').src =
+            '/api/qr?t=' + Date.now();
+
+        updateTimer();
+
+        if (timer) {
+            clearInterval(timer);
+        }
+
+        timer = setInterval(updateTimer, 1000);
+
+    } catch (error) {
+        console.error(error);
+
+        document.getElementById('error').textContent =
+            'Не удалось получить временный доступ.';
+    }
+}
+
+function updateTimer() {
+    const remaining = Math.max(
+        0,
+        Math.floor((expiresAt - Date.now()) / 1000)
+    );
+
+    const minutes = Math.floor(remaining / 60);
+    const seconds = remaining % 60;
+
+    document.getElementById('time').textContent =
+        minutes + ':' + String(seconds).padStart(2, '0');
+
+    if (remaining <= 0) {
+        clearInterval(timer);
+
+        setTimeout(() => {
+            loadAccess();
+        }, 1000);
+    }
+}
+
+document.getElementById('copy').addEventListener('click', async () => {
+    const text = document.getElementById('vless').textContent;
+
+    if (!text || text === 'Получение ссылки...') {
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(text);
+
+        const button = document.getElementById('copy');
+        const oldText = button.textContent;
+
+        button.textContent = 'Скопировано';
+
+        setTimeout(() => {
+            button.textContent = oldText;
+        }, 1500);
+
+    } catch (error) {
+        console.error(error);
+    }
+});
+
+loadAccess();
+</script>
+
+</body>
+</html>
