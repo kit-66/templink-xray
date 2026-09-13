@@ -1,10 +1,9 @@
 module templink-web
 
-go 1.25
+go 1.26
 
 require (
 	github.com/google/uuid v1.6.0
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b65686883
-	github.com/xtls/xray-core v1.8.25-0.20250218115507-52381a3c038b
-	google.golang.org/grpc v1.75.0
+	github.com/xtls/xray-core 52a412d
 )
