@@ -10,7 +10,8 @@ services:
     command: ["run", "-config", "/etc/xray/config.json"]
 
   web:
-    build: ./web
+    # build: ./web #копировать репо и собирать самому
+    image: comradekit66/templink-web:1.0.0 #готовый образ
     container_name: templink-web
     restart: unless-stopped
     network_mode: host
