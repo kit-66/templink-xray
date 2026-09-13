@@ -3,19 +3,22 @@
     "loglevel": "warning"
   },
 
+  "api": {
+    "tag": "api",
+    "listen": "127.0.0.1:10085",
+    "services": [
+      "HandlerService"
+    ]
+  },
+
   "inbounds": [
     {
-      "listen": "127.0.0.1",
+      "listen": "0.0.0.0",
       "port": 10000,
       "protocol": "vless",
 
       "settings": {
-        "clients": [
-          {
-            "id": "2e6b158b-b505-474f-93b1-9a80820601a2",
-            "level": 0
-          }
-        ],
+        "clients": [],
         "decryption": "none"
       },
 
