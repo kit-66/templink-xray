@@ -1,12 +1,20 @@
 services:
+
   xray:
     image: ghcr.io/xtls/xray-core:26.9.9
     container_name: templink-xray
     restart: unless-stopped
-
     network_mode: host
-
     volumes:
       - ./xray/config.json:/etc/xray/config.json:ro
-
     command: ["run", "-config", "/etc/xray/config.json"]
+
+  web:
+    build: ./web
+    container_name: templink-web
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    volumes:
+      - ./web/site:/app/site:ro
