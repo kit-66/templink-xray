@@ -4,14 +4,23 @@
   },
 
   "api": {
-    "tag": "api",
-    "listen": "127.0.0.1:10085",
     "services": [
       "HandlerService"
-    ]
+    ],
+    "tag": "api"
   },
 
   "inbounds": [
+    {
+      "listen": "127.0.0.1",
+      "port": 10085,
+      "protocol": "dokodemo-door",
+      "settings": {
+        "address": "127.0.0.1"
+      },
+      "tag": "api"
+    },
+
     {
       "listen": "0.0.0.0",
       "port": 10000,
@@ -42,6 +51,11 @@
     },
 
     {
+      "protocol": "freedom",
+      "tag": "api"
+    },
+
+    {
       "protocol": "blackhole",
       "tag": "block"
     }
@@ -49,6 +63,15 @@
 
   "routing": {
     "domainStrategy": "AsIs",
-    "rules": []
+
+    "rules": [
+      {
+        "type": "field",
+        "inboundTag": [
+          "api"
+        ],
+        "outboundTag": "api"
+      }
+    ]
   }
 }
